@@ -1,0 +1,157 @@
+---
+title: "Practical Machine Learning Project"
+author: "David Pérez Sánchez"
+date: "Tuesday, December 16, 2014"
+output: html_document
+---
+
+## Sypnosys
+
+Using devices such as *Jawbone Up*, *Nike FuelBand*, and *Fitbit* it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement - a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, the goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website here: http://groupware.les.inf.puc-rio.br/har (see the section on the Weight Lifting Exercise Dataset). 
+
+## Get Starting
+
+In order to being reproducible, we load the librarys that we need to make this report. You can find all those packages in CRAN repositories.
+
+```{r}
+library(caret)
+```
+
+and we put the session Info:
+
+```{r}
+sessionInfo()
+```
+
+
+## Getting and Cleaning data
+
+Let's going to donwload the data. We have two datasets: one with the training data, where we're going to perform our predictive model, and another one with the testing data, where we will predict the way that how they perfom their activities.
+
+```{r}
+if (!file.exists("data")) {
+        dir.create("data")
+        trainUrl<- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+        testUrl <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+        download.file(trainUrl, "./data/train.csv")
+        download.file(testUrl, "./data/test.csv")
+}
+```
+
+We load the data into two objects that we named it ```data``` and ```test```.
+
+```{r}
+data <- read.csv("./data/train.csv")
+
+test <- read.csv("./data/test.csv")
+```
+
+We take a look of the names of ```data``` variables. 
+```{r}
+names(data)
+```
+
+and check if they are the same in ```test``` datasets:
+
+```{r}
+names(data)==names(test)
+```
+
+
+
+We will be interested in the variables which contain the string *accel*, *gyros* and *magnet* in their variables names. Also, we retain the *classe* variable which is the varible we want to predict. In order to mantain the integrity of the data, we choose also the ten first varibles, although we don't need it to perform the predictive model. We note that *classe* variable is not present in the test object. Is the variable we will have to predict.
+
+We want the indexes of the variables that we describe above:
+
+```{r}
+accel <- grep("accel", names(data))
+gyros <- grep("gyros", names(data))
+magnet <- grep("magnet", names(data))
+```
+
+We know that the index of *classe* variable is 160. We create a variable named it *select* where there is all the indexes we want:
+
+```{r}
+select <- c(1:10, accel, gyros, magnet, 160)
+```
+
+We subset ```data``` and ```test``` datasets:
+
+```{r}
+data <- data[select]
+test <- test[select]
+```
+
+and summarize the ```data``` variables:
+
+```{r}
+summary(data)
+```
+
+We observe that the variables with the string *var* in their names have a large NA's data. We remove those variables from the both data sets:
+
+```{r}
+data <- data[-grep("var", names(data))]
+test <- test[-grep("var", names(test))]
+```
+
+Finally, we remove the last variable from ```test``` dataset
+
+```{r}
+test <- test[-55]
+```
+
+## Predictive Model
+
+We want to create a predictive model with the ```data``` dataset and performance into the ```test``` dataset in order to predict the way that the user in ```test``` dataset have done their activities. We're going to do a simple random forest model.
+
+### Cross Validation
+
+We're going to subset the ```data``` dataset into a **training** dataset and **testing** dataset. We will create a model with training and validate this model with testing dataset.
+
+We`re going to put the 70% of the data into training and the rest in testing:
+
+```{r}
+inTrain <- createDataPartition(y=data$classe, p=0.7, list=FALSE)
+training <- data[inTrain,]
+testing <- data[inTrain,]
+```
+
+We create the model:
+
+```{r, cache=TRUE}
+set.seed(135)
+model <- train(classe~., data=training[-(1:7)], method="rf", trControl=trainControl(method="cv"), number=10)
+```
+
+We look at the model information:
+
+```{r}
+model
+```
+
+We observe that the model accuracy is 0.9908282. We're going to predict the data of classe varible of the testing set.
+
+```{r}
+predictions <- predict(model, newdata=testing)
+```
+
+And we show the Confusion Matrix:
+
+```{r}
+table(testing$classe, predictions)
+```
+
+We observe that there is not a misclassification data, therefore we can say that there is not error in our estimation.
+
+### Predicting Values
+
+Finally, we can now to estimate the values of classe variable in the ```test``` data:
+
+```{r}
+test$classe <- predict(model, newdata=test)
+test$classe
+```
+
+
+
